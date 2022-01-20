@@ -6,17 +6,16 @@ from datetime import date, timedelta
 from typing import Optional
 import asyncio
 import aiohttp
-from aiohttp import ClientSession
 
 
-class CPUList(object):
+class CPUList:
     def __init__(self, processors, attributes, link_base):
         self.processors = processors
         self.attributes = attributes
         self.link_base = link_base
         self.changed_something = False
 
-    async def fetch_html(self, url: str, session: ClientSession, **kwargs) -> Optional[str]:
+    async def fetch_html(self, url: str, session: aiohttp.ClientSession, **kwargs) -> Optional[str]:
         """GET request wrapper to fetch page HTML.
 
         kwargs are passed to `session.request()`.
@@ -31,37 +30,40 @@ class CPUList(object):
             logging.debug("Size of html: %i", len(html))
             return html
 
-    async def update_one(self, id: str, session: ClientSession) -> None:
-        """Downloading ids with session."""
-        processor = self.processors[id]
-        link = self.link_base + id
+    def update_dict(self, cpu_id, response_text):
+        if not response_text:
+            return
+        processor = self.processors[cpu_id]
+        cpu_name = processor["Name"]
+        for key, method in self.attributes.items():
+            try:
+                processor[key] = method(response_text).strip()
+            except IndexError:
+                logging.error("Error on key %s and with link %s", key, self.link_base + cpu_id)
+                processor[key] = "-"
+
+        if cpu_name != processor["Name"]:
+            logging.error("%s is not online %s with cpu_id %s", processor["Name"], cpu_name, cpu_id)
+        today = date.today()
+        processor["Updated"] = today.strftime("%Y-%m-%d")
+        self.changed_something = True
+
+    async def update_one(self, cpu_id: str, session: aiohttp.ClientSession) -> None:
+        """Downloading cpu_ids with session."""
+        processor = self.processors[cpu_id]
+        link = self.link_base + cpu_id
         processor["Link"] = link
         if "Updated" in processor and date.fromisoformat(processor["Updated"]) + timedelta(days=7) > date.today():
             logging.info("skipping update of %s", processor["Name"])
         else:
             logging.debug("Used link: %s", link)
             response_text = await self.fetch_html(link, session=session)
-            if response_text:
-                cpu_name = processor["Name"]
-                for key, method in self.attributes.items():
-                    try:
-                        processor[key] = method(response_text).strip()
-                    except IndexError:
-                        logging.error("Error on key %s and with link %s", key, link)
-                        processor[key] = "-"
-
-                if cpu_name != processor["Name"]:
-                    logging.error("%s is not online %s with id %s", processor["Name"], cpu_name, id)
-                today = date.today()
-                processor["Updated"] = today.strftime("%Y-%m-%d")
-                self.changed_something = True
+            self.update_dict(cpu_id, response_text)
 
     async def bulk_crawl_and_write(self, my_csv: str) -> None:
         """Crawl & write concurrently to `file` for multiple `urls`."""
-        async with ClientSession(raise_for_status=True) as session:
-            tasks = []
-            for id in self.processors:
-                tasks.append(self.update_one(id, session=session))
+        async with aiohttp.ClientSession(raise_for_status=True) as session:
+            tasks = tuple(self.update_one(cpu_id, session=session) for cpu_id in self.processors)
             await asyncio.gather(*tasks)
 
         print_table(self.attributes.keys(), self.processors)
@@ -111,7 +113,7 @@ def prefill_with_csv(my_csv, processors, link_base):
     return processors
 
 
-def main():
+async def main():
     attributes = {
         "Name": lambda html: re.findall(r'<span class="cpuname"> *([^@<]*) *(@[^<]*)?</span>', html)[0][0],
         "First Seen": lambda html: re.findall(r'<strong class="bg-table-row">CPU First Seen on Charts:</strong>(&nbsp;)*([^<]*)</p>', html)[0][1],
@@ -165,7 +167,7 @@ def main():
     processors = prefill_with_csv(my_csv, processors, link_base)
     # update_and_display(processors, attributes, link_base, CSV)
     cpulist = CPUList(processors, attributes, link_base)
-    asyncio.run(cpulist.bulk_crawl_and_write(my_csv))
+    await cpulist.bulk_crawl_and_write(my_csv)
 
 
 if __name__ == "__main__":
@@ -174,4 +176,4 @@ if __name__ == "__main__":
         # level=logging.DEBUG,
         datefmt="%H:%M:%S",
     )
-    main()
+    asyncio.run(main())

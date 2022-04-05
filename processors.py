@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from typing import Optional
 import asyncio
 import aiohttp
+from tqdm.asyncio import tqdm_asyncio
 
 
 class CPUList:
@@ -64,7 +65,7 @@ class CPUList:
         """Crawl & write concurrently to `file` for multiple `urls`."""
         async with aiohttp.ClientSession(raise_for_status=True) as session:
             tasks = tuple(self.update_one(cpu_id, session=session) for cpu_id in self.processors)
-            await asyncio.gather(*tasks)
+            await tqdm_asyncio.gather(*tasks)
 
         print_table(self.attributes.keys(), self.processors)
 

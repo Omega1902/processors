@@ -116,14 +116,19 @@ def prefill_with_csv(my_csv, processors, link_base):
 async def main():
     attributes = {
         "Name": lambda html: re.findall(r'<span class="cpuname"> *([^@<]*) *(@[^<]*)?</span>', html)[0][0],
-        "First Seen": lambda html: re.findall(r'<strong class="bg-table-row">CPU First Seen on Charts:</strong>(&nbsp;)*([^<]*)</p>', html)[0][1],
+        "First Seen": lambda html: re.findall(
+            r'<strong class="bg-table-row">CPU First Seen on Charts:</strong>(&nbsp;)*([^<]*)</p>', html
+        )[0][1],
         "Single Thread": lambda html: re.findall(r"<strong> *Single Thread Rating: *</strong> *(\d+)<br/?>", html)[0],
         "Multi Thread": lambda html: re.findall(
-            r'<span style="font-family: Arial, Helvetica, sans-serif;font-size: 44px;	font-weight: bold; color: #F48A18;">(\d+)</span>', html
+            r'<span style="font-family: Arial, Helvetica, sans-serif;font-size: 44px;	font-weight: bold; color: #F48A18;">(\d+)</span>',
+            html,
         )[0],
         "TDP": lambda html: re.findall(r"<strong>Typical TDP:</strong> *(\d+) *W(<sup>\d+</sup>)?</p>", html)[0][0],
         # "Cores": lambda html: re.findall(r'<strong>No of Cores:</strong> *([^<]+) *</p>', html)[0]
-        "Cores": lambda html: "{} ({})".format(*re.findall(r"<strong>Cores:?</strong>:? *(\d+) *<strong>Threads:?</strong>:? *(\d+) *</p>", html)[0]),
+        "Cores": lambda html: "{} ({})".format(
+            *re.findall(r"<strong>Cores:?</strong>:? *(\d+) *<strong>Threads:?</strong>:? *(\d+) *</p>", html)[0]
+        ),
         "# Samples": lambda html: re.findall(r"<strong> *Samples: *</strong> *(\d+)\s*\*?\s*<br/?>", html)[0],
     }
     link_base = "https://www.cpubenchmark.net/cpu.php?id="

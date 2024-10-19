@@ -1,10 +1,11 @@
+import asyncio
+import csv
+import logging
 import os
 import re
-import logging
-import csv
 from datetime import date, timedelta
 from typing import Optional
-import asyncio
+
 import aiohttp
 from tqdm.asyncio import tqdm_asyncio
 
@@ -39,7 +40,7 @@ class CPUList:
         for key, method in self.attributes.items():
             try:
                 processor[key] = method(response_text).strip()
-            except IndexError:
+            except IndexError:  # noqa: PERF203
                 logging.error("Error on key %s and with link %s", key, self.link_base + cpu_id)
                 processor[key] = "-"
 
@@ -70,7 +71,7 @@ class CPUList:
         print_table(self.attributes.keys(), self.processors)
 
         if self.changed_something:
-            write_csv(list(self.attributes.keys()) + ["Link", "Updated"], self.processors, my_csv)
+            write_csv([*self.attributes.keys(), "Link", "Updated"], self.processors, my_csv)
 
 
 def write_csv(header, processors, filename):

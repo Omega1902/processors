@@ -1,0 +1,34 @@
+line-length = 120
+target-version = "py38"
+extend-exclude = [".vscode", "htmlcov"]
+fix = true
+
+[lint]
+# On top of the default `select` (E, F), enable:
+# Warnings of pycodestyles (W)
+# isort (I)
+# flake8-bandit (S)
+# flake8-bugbear (B)
+# flake8-builtins (A)
+# flake8-comprehensions (C4)
+# flake8-logging (LOG)
+# flake8-logging-format (G)
+# flake8-raise (RSE)
+# flake8-return (RET)
+# flake8-siplify (SIM)
+# pylint (PL)
+# perflint (PERF)
+# Ruff-specific rules (RUF)
+extend-select = ["W", "I", "S", "B", "A", "C4", "LOG", "G", "RSE", "RET", "SIM", "PL", "PERF", "RUF"]
+# I want to use lambdas
+ignore = ["E731", "S101"]
+
+[format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"

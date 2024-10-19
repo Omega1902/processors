@@ -4,14 +4,16 @@ import logging
 import os
 import re
 from datetime import date, timedelta
-from typing import Optional
+from typing import Callable, Optional
 
 import aiohttp
 from tqdm.asyncio import tqdm_asyncio
 
 
 class CPUList:
-    def __init__(self, processors, attributes, link_base):
+    def __init__(
+        self, processors: dict[str, dict[str, str]], attributes: dict[str, Callable[[str], str]], link_base: str
+    ) -> None:
         self.processors = processors
         self.attributes = attributes
         self.link_base = link_base
@@ -32,7 +34,7 @@ class CPUList:
             logging.debug("Size of html: %i", len(html))
             return html
 
-    def update_dict(self, cpu_id, response_text):
+    def update_dict(self, cpu_id: str, response_text: Optional[str]) -> None:
         if not response_text:
             return
         processor = self.processors[cpu_id]
@@ -116,14 +118,16 @@ def prefill_with_csv(my_csv, processors, link_base):
 
 
 async def main():
-    attributes = {
+    attributes: dict[str, Callable[[str], str]] = {
         "Name": lambda html: re.findall(r'<span class="cpuname"> *([^@<]*) *(@[^<]*)?</span>', html)[0][0],
         "First Seen": lambda html: re.findall(
             r'<strong class="bg-table-row">CPU First Seen on Charts:</strong>(&nbsp;)*([^<]*)</p>', html
         )[0][1],
-        "Single Thread": lambda html: re.findall(r"<strong> *Single Thread Rating: *</strong> *(\d+)<br/?>", html)[0],
+        "Single Thread": lambda html: re.findall(
+            r"<div[^>]*>\s*Single Thread Rating:?\s*</div>\s*<div[^>]*>\s*(\d+)\s*</div>", html
+        )[0],
         "Multi Thread": lambda html: re.findall(
-            r'<span style="font-family: Arial, Helvetica, sans-serif;font-size: 44px;	font-weight: bold; color: #F48A18;">(\d+)</span>',
+            r"<div[^>]*>\s*Multithread Rating:?\s*</div>\s*<div[^>]*>\s*(\d+)\s*</div>",
             html,
         )[0],
         "TDP": lambda html: re.findall(r"<strong>Typical TDP:</strong> *(\d+) *W(<sup>\d+</sup>)?</p>", html)[0][0],

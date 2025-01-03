@@ -14,7 +14,7 @@ from tqdm.asyncio import tqdm_asyncio
 class CPUList:
     def __init__(
         self, processors: dict[str, dict[str, str]], attributes: dict[str, Callable[[str], str]], link_base: str
-    ):
+    ) -> None:
         self.processors = processors
         self.attributes = attributes
         self.link_base = link_base
@@ -35,7 +35,7 @@ class CPUList:
             logging.debug("Size of html: %i", len(html))
             return html
 
-    def update_dict(self, cpu_id, response_text):
+    def update_dict(self, cpu_id: str, response_text: str | None) -> None:
         if not response_text:
             return
         processor = self.processors[cpu_id]
@@ -74,7 +74,7 @@ class CPUList:
         print_table(self.attributes.keys(), self.processors)
 
         if self.changed_something:
-            write_csv([*list(self.attributes.keys()), "Link", "Updated"], self.processors, my_csv)
+            write_csv([*self.attributes.keys(), "Link", "Updated"], self.processors, my_csv)
 
 
 def write_csv(header: list[str], processors: dict, filename: Path):
@@ -124,9 +124,11 @@ async def main():
         "First Seen": lambda html: re.findall(
             r'<strong class="bg-table-row">CPU First Seen on Charts:</strong>(&nbsp;)*([^<]*)</p>', html
         )[0][1],
-        "Single Thread": lambda html: re.findall(r"<strong> *Single Thread Rating: *</strong> *(\d+)<br/?>", html)[0],
+        "Single Thread": lambda html: re.findall(
+            r"<div[^>]*>\s*Single Thread Rating:?\s*</div>\s*<div[^>]*>\s*(\d+)\s*</div>", html
+        )[0],
         "Multi Thread": lambda html: re.findall(
-            r'<span style="font-family: Arial, Helvetica, sans-serif;font-size: 44px;	font-weight: bold; color: #F48A18;">(\d+)</span>',
+            r"<div[^>]*>\s*Multithread Rating:?\s*</div>\s*<div[^>]*>\s*(\d+)\s*</div>",
             html,
         )[0],
         "TDP": lambda html: re.findall(r"<strong>Typical TDP:</strong> *(\d+) *W(<sup>\d+</sup>)?</p>", html)[0][0],

@@ -1,22 +1,26 @@
-import os
-import re
-import logging
-import csv
-from datetime import date, timedelta
-from typing import Optional
+#!/bin/env python3
 import asyncio
+import csv
+import logging
+import re
+from collections.abc import Callable
+from datetime import date, timedelta
+from pathlib import Path
+
 import aiohttp
 from tqdm.asyncio import tqdm_asyncio
 
 
 class CPUList:
-    def __init__(self, processors, attributes, link_base):
+    def __init__(
+        self, processors: dict[str, dict[str, str]], attributes: dict[str, Callable[[str], str]], link_base: str
+    ):
         self.processors = processors
         self.attributes = attributes
         self.link_base = link_base
         self.changed_something = False
 
-    async def fetch_html(self, url: str, session: aiohttp.ClientSession, **kwargs) -> Optional[str]:
+    async def fetch_html(self, url: str, session: aiohttp.ClientSession, **kwargs) -> str | None:
         """GET request wrapper to fetch page HTML.
 
         kwargs are passed to `session.request()`.
@@ -61,7 +65,7 @@ class CPUList:
             response_text = await self.fetch_html(link, session=session)
             self.update_dict(cpu_id, response_text)
 
-    async def bulk_crawl_and_write(self, my_csv: str) -> None:
+    async def bulk_crawl_and_write(self, my_csv: Path) -> None:
         """Crawl & write concurrently to `file` for multiple `urls`."""
         async with aiohttp.ClientSession(raise_for_status=True) as session:
             tasks = tuple(self.update_one(cpu_id, session=session) for cpu_id in self.processors)
@@ -70,11 +74,11 @@ class CPUList:
         print_table(self.attributes.keys(), self.processors)
 
         if self.changed_something:
-            write_csv(list(self.attributes.keys()) + ["Link", "Updated"], self.processors, my_csv)
+            write_csv([*list(self.attributes.keys()), "Link", "Updated"], self.processors, my_csv)
 
 
-def write_csv(header, processors, filename):
-    with open(filename, "w", newline="") as csvfile:
+def write_csv(header: list[str], processors: dict, filename: Path):
+    with filename.open("w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=header)
         writer.writeheader()
         for processor in processors.values():
@@ -98,9 +102,9 @@ def print_table(header, processors):
         print(print_format.format(*[processor[key] for key in header]))
 
 
-def prefill_with_csv(my_csv, processors, link_base):
+def prefill_with_csv(my_csv: Path, processors: dict[str, dict[str, str]], link_base: str) -> dict[str, dict[str, str]]:
     try:
-        with open(my_csv) as csvfile:
+        with my_csv.open() as csvfile:
             csvreader = csv.reader(csvfile)
             header = csvreader.__next__()
             link_index = header.index("Link")
@@ -109,13 +113,13 @@ def prefill_with_csv(my_csv, processors, link_base):
                 if key in processors:
                     for i, item in enumerate(row):
                         processors[key][header[i]] = item
-    except IOError as ioe:
+    except OSError as ioe:
         logging.info("Error on reading %s: %s", my_csv, str(ioe))
     return processors
 
 
 async def main():
-    attributes = {
+    attributes: dict[str, Callable[[str], str]] = {
         "Name": lambda html: re.findall(r'<span class="cpuname"> *([^@<]*) *(@[^<]*)?</span>', html)[0][0],
         "First Seen": lambda html: re.findall(
             r'<strong class="bg-table-row">CPU First Seen on Charts:</strong>(&nbsp;)*([^<]*)</p>', html
@@ -132,8 +136,8 @@ async def main():
         ),
         "# Samples": lambda html: re.findall(r"<strong> *Samples: *</strong> *(\d+)\s*\*?\s*<br/?>", html)[0],
     }
-    link_base = "https://www.cpubenchmark.net/cpu.php?id="
-    processors = {
+    link_base: str = "https://www.cpubenchmark.net/cpu.php?id="
+    processors: dict[str, dict[str, str]] = {
         "1850": {"Name": "Intel Core i5-3337U"},
         "828": {"Name": "Intel Core i5-3570K"},
         "3447": {"Name": "Intel Core i5-8365U"},
@@ -144,7 +148,7 @@ async def main():
         "4141": {"Name": "AMD Ryzen 5 5500U"},
     }
 
-    my_csv = os.path.join(os.path.dirname(os.path.realpath(__file__)), "processors.csv")
+    my_csv = Path(__file__).parent / "processors.csv"
 
     processors = prefill_with_csv(my_csv, processors, link_base)
     # update_and_display(processors, attributes, link_base, CSV)
